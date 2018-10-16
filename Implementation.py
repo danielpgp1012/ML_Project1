@@ -9,13 +9,80 @@ import matplotlib.pyplot as plt
 from proj1_helpers import *
 
 
+
+
 # In[5]:
+#Standardize
+def standardize(x):
+    """Standardize the original data set."""
+    mean=[]
+    std=[]
+    dims=np.shape(x)
+    D=dims[1]
+    for i in range (D):
+        mean_x = np.mean(x[:,i])
+        x[:,i] = x[:,i] - mean_x
+        std_x = np.std(x[:,i])
+        x[:,i]= x[:,i]/std_x
+        mean.append(mean_x)
+        std.append(std_x)
+    return x, mean, std
+#Build polynomial
+
+def remove_outliers(x,y):
+    """trying to assign outliers random non-outlier x values"""
+    indices_outliers=x==-999 #return a boolean vector of size x containing 1 for each outlier
+    indices_good=not indices_outliers #returns the rest 
+    for i in range(x.shape[1]): #iteration over each feature
+        indices_yequals1=y(y[indices_good[:,i]]==1)
+        indices_ynotequals1=y(y[indices_good[:,i]]==-1)
+        for index,val in indices_good[i]: #iteration over indices
+             if not val: #if val of indices is false
+                    if y[index]==1:
+                        x[index,i]=random.choice(x[indices_yequals1,i]) #assign x to have a random x value that has the same y value
+                    else:
+                        x[index,i]=random.choice(x[indices_ynotequals1,i])
+                       
+                    
+                 
+                 
+            
+
+def build_poly(tx, degree):
+    dims=np.shape(tx)
+    n=dims[0]
+    D=dims[1]
+    phi=np.ones((n,D*degree+1))
+    p=1;
+    for i in range(1,degree*D,D):
+        phi[:,i:i+D]=np.power(tx,p)
+        p=p+1
+    return phi
+
+def build_poly_improved(tx, degrees,exp):
+    #exp is a boolean vector of size D where 1 correspond to evaluate a exponential in the model
+    #degrees is an int vector of size D where each entry corresponds to the degree of polynomial evaluated in the model 
+    dims=np.shape(tx)
+    n=dims[0]
+    D=dims[1]
+    No_Cols=1+np.sum((degrees))+np.sum((exp)) #No. columns in phi
+    phi=np.ones((n,int(No_Cols))) #preallocate phi
+    p=1 #initialize power at 1
+    i=1 #initialize position at 1 because column 0 is a constant term 
+    while (i<No_Cols):
+        tx_polyadd=tx[:,degrees>=p]
+        tx_expadd=tx[:,exp==i] #will only be evaluated once
+        elements=np.shape(tx_polyadd)[1]+np.shape(tx_expadd)[1]
+        phi[:,i:i+elements]=np.concatenate((np.power(tx_polyadd,p),np.exp(tx_expadd)),axis=1)
+        p=p+1
+        i=i+elements
+    return phi
 
 
 #Compute Loss
 def calculate_mse(e):
     """Calculate the mse for vector e."""
-    return 1/2*np.mean(e**2)
+    return 1/2*np.mean((e)**2)
 
 
 def compute_loss(y, tx, w):
@@ -25,7 +92,7 @@ def compute_loss(y, tx, w):
     """
     y_pred = predict_labels(w,tx) #returns -1 and +1
     
-    e = y - y_pred
+    e =(y - y_pred)
     return calculate_mse(e)
 
 
@@ -36,12 +103,32 @@ def compute_loss(y, tx, w):
 def compute_gradient(y, tx, w):
     """Compute the gradient."""
     y_pred=predict_labels(w,tx)
-    e = y - y_pred;
+    e = (y - y_pred);
     grad = -tx.T.dot(e) / len(e) #x transposed times error (with sign)
     return grad, e
 
 
 # In[7]:
+#Split Data into test and training
+import numpy as np
+
+
+def split_data(x, y, ratio, myseed=1):
+    """split the dataset based on the split ratio."""
+    # set seed
+    np.random.seed(myseed)
+    # generate random indices
+    num_row = len(y)
+    indices = np.random.permutation(num_row)
+    index_split = int(ratio * num_row)
+    index_tr = indices[:index_split]
+    index_te = indices[index_split:]
+    # create split
+    x_tr = x[index_tr,:]
+    x_te = x[index_te,:]
+    y_tr = y[index_tr]
+    y_te = y[index_te]
+    return x_tr, x_te, y_tr, y_te
 
 
 # Least Squares GD
@@ -114,10 +201,9 @@ def least_squares_SGD(y, tx, initial_w,batch_size,max_iters, gamma):
             # store w and loss
             ws.append(w)
             losses.append(loss)
-            print("SGD({bi}/{ti}): loss={l} ".format(
-              bi=n_iter, ti=max_iters - 1, l=loss)
-            for i in range(len(w))
-                print("w({index}): {weight} ". format(index=i, weight=w[i])
+            print("SGD({bi}/{ti}): loss={l} ".format(bi=n_iter, ti=max_iters - 1, l=loss))
+            for i in range (len(w)):
+                print("w({index}): {weight} ". format(index=i, weight=w[i]))
             print ("\n")
     return losses, ws
 
@@ -152,10 +238,11 @@ def ridge_regression(y, tx, lambda_):
     # INSERT YOUR CODE HERE
     # ridge regression: TODO
     # ***************************************************
-    lambda_prime=lambda_*2*len(tx)
-    D=min(tx.shape)
-    gram=np.transpose(tx).dot(tx)+lambda_prime*np.identity(D)
-    w_opt= inv(gram).dot(np.transpose(tx).dot(y))
+    lambda_prime=lambda_*2*np.shape(tx)[0]
+    D=tx.shape[1]
+    a=np.transpose(tx).dot(tx)+lambda_prime*np.identity(D)
+    b=tx.T.dot(y)
+    w_opt= np.linalg.solve(a,b)
     loss=compute_loss(y,tx,w_opt)
     return loss,w_opt
 
@@ -178,7 +265,60 @@ def plot_data(y,tx,feature):
 
 
 # In[ ]:
+def print_ws(w):
+    """Print ws"""
+    for i in range (len(w)):
+          print("w({index}): {weight} ". format(index=i, weight=w[i]))
+    print ("\n")
 
-
-
-
+# In [13]
+#Indices: Create an array with k_fold rows containing n/k_fold indices
+def build_k_indices(y, k_fold, seed=1):
+    """build k indices for k-fold."""
+    num_row = y.shape[0]
+    interval = int(num_row / k_fold)
+    np.random.seed(seed)
+    indices = np.random.permutation(num_row)
+    k_indices = [indices[k * interval: (k + 1) * interval]
+                 for k in range(k_fold)]
+    return np.array(k_indices)
+    
+# In [14]
+#K-fold Cross Validation
+def cross_validation(y, phi, k_indices, k, lambda_, degree):
+    """return the loss of ridge regression."""
+    # ***************************************************
+    # INSERT YOUR CODE HERE
+    # get k'th subgroup in test, others in train: TODO
+    # ***************************************************
+    phi_te=phi[k_indices[k,:],:]
+    y_te=y[k_indices[k,:]]
+    rest_indeces=np.delete(k_indices,k,0)
+    phi_tr=phi[rest_indeces.flatten(),:]
+    y_tr=y[rest_indeces.flatten()]
+    #raise NotImplementedError
+    # ***************************************************
+    # INSERT YOUR CODE HERE
+    # form data with polynomial degree: TODO
+    # ***************************************************
+    #raise NotImplementedError
+    # ***************************************************
+    # INSERT YOUR CODE HERE
+    # ridge regression: TODO
+    # ***************************************************
+    loss_tr,w_tr=ridge_regression(y_tr,phi_tr,lambda_)
+    
+    #raise NotImplementedError
+    # ***************************************************
+    # INSERT YOUR CODE HERE
+    # calculate the loss for train and test data: TODO
+    # ***************************************************
+    loss_te=compute_loss(y_te,phi_te,w_tr)
+    # raise NotImplementedError
+    return loss_tr, loss_te,w_tr
+      
+#In [15]
+#This program will iterate over different lambdas and find the one that gives the minimum test loss    
+def min_loss_crossvalidation(tx,y):
+        """We want to find the minimum lambda by changing it and iterating  """
+   
